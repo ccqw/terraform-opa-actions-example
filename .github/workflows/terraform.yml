@@ -19,6 +19,11 @@ jobs:
         with:
           # terraform_version: 0.13.0:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v1
+        with:
+          version: latest
 
       - name: Terraform Format
         id: fmt
@@ -37,6 +42,18 @@ jobs:
         if: github.event_name == 'pull_request'
         run: terraform plan -no-color -input=false
         continue-on-error: true
+
+      - name: Convert Terraform Plan into JSON
+        id: show
+        run: terraform show -json tfplan.binary > tfplan.json
+
+      - name: Evaluate the OPA policy on Terraform plan authz
+        id: opa_authz
+        run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.authz"
+      
+      - name: Evaluate the OPA policy on Terraform plan score
+        id: opa_score
+        run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.score"
 
       - uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
