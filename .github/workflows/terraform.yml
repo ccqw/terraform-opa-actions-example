@@ -42,17 +42,20 @@ jobs:
         if: github.event_name == 'pull_request'
         run: terraform plan -no-color -input=false
         continue-on-error: true
+      
+      - name: Terraform run url
+        id: tf-run-url
+        run: |
+          echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
 
-      - name: Convert Terraform Plan into JSON
-        id: show
-        run: terraform show -json tfplan.binary > tfplan.json
+      - name: Convert Terraform execution plan to json for OPA
+        run: |
+          curl $(echo $(curl --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" --header "Content-Type: application/vnd.api+json" "https://app.terraform.io/api/v2/${{ steps.tf-run-url.outputs.RUN_URL }}/plan/json-output" | grep -o -P '(?<= <a href=").*(?=">)')) -o tfplan.json
 
       - name: Evaluate the OPA policy on Terraform plan authz
-        id: opa_authz
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.authz"
       
       - name: Evaluate the OPA policy on Terraform plan score
-        id: opa_score
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.score"
 
       - uses: actions/github-script@v6
