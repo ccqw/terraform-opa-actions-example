@@ -57,6 +57,16 @@ jobs:
       
       - name: Evaluate the OPA policy on Terraform plan score
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.score"
+      
+      - name: Evaluate the OPA policy to ensure S3 bucket is not public
+        id: opa-s3-public
+        run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-s3-bucket-public".* ]]; then exit 1; fi
+
+      # naming convention set in terraform.rego
+      # bucket must start with 'ccqw-terraform-opa-actions-example'
+      - name: Evaluate the OPA policy to ensure S3 bucket follows naming convention
+        id: opa-s3-name
+        run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-s3-bucket-name".* ]]; then exit 1; fi
 
       - uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
