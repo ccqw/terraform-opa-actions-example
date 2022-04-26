@@ -12,12 +12,13 @@ blast_radius := 30
 # weights assigned for each operation on each resource-type
 weights := {
     "aws_autoscaling_group": {"delete": 100, "create": 10, "modify": 1},
-    "aws_instance": {"delete": 10, "create": 1, "modify": 1}
-    "aws_s3_bucket": {"acl": 10, "name":10}
+    "aws_instance": {"delete": 10, "create": 1, "modify": 1, "tags": 10},
+    "aws_s3_bucket": {"acl": 10, "tags": 10, "name":10},
+    "aws_security_group": {"tags": 10, "name":10}
 }
 
 # Consider exactly these resource types in calculations
-resource_types := {"aws_autoscaling_group", "aws_instance", "aws_iam", "aws_launch_configuration", "aws_s3_bucket"}
+resource_types := {"aws_autoscaling_group", "aws_instance", "aws_security_group", "aws_iam", "aws_launch_configuration", "aws_s3_bucket"}
 
 #########
 # Policy
@@ -40,7 +41,8 @@ score = s {
             mod := crud["modify"] * num_modifies[resource_type];
             acl_chg := crud["acl"] * s3_acl_change[resource_type];
             s3name := crud["name"] * s3_name_change[resource_type];
-            x := del + new + mod + acl_chg + s3name
+            tags_chg := crud["tags"] * s3_tags_change[resource_type];
+            x := del + new + mod + acl_chg + s3name + tags_chg
     ]
     s := sum(all)
 }
@@ -74,7 +76,6 @@ num_creates[resource_type] = num {
     num := count(creates)
 }
 
-
 # number of deletions of resources of a given type
 num_deletes[resource_type] = num {
     some resource_type
@@ -101,6 +102,10 @@ violation["violation-s3-bucket-name"] {
    s3_name_change[resource_types[_]] > 0
 }
 
+violation["violation-missing-required-tags"] {
+   s3_tags_change[resource_types[_]] > 0
+}
+
 s3_acl_change[resource_type] = num {
     some resource_type
     resource_types[resource_type]
@@ -115,4 +120,18 @@ s3_name_change[resource_type] = num {
     all := resources[resource_type]
     modifies := [res |  res:= all[_]; not re_match(`ccqw-terraform-opa-actions-example.*`, (res.change.after.bucket))]
     num := count(modifies)
+}
+
+s3_tags_change[resource_type] = num {
+    some resource_type
+    resource_types[resource_type]
+    all := resources[resource_type]
+    modifies := [res |  res:= all[_]; not tags_contain_proper_keys(res.change.after.tags)]
+    num := count(modifies)
+}
+
+tags_contain_proper_keys(tags) {
+    keys := {key | tags[key]}
+    leftover := minimum_tags - keys
+    leftover == set()
 }

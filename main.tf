@@ -45,6 +45,7 @@ resource "aws_security_group" "github-actions-ssh-sg" {
 
   tags = {
     Name = "github-actions-ssh-sg"
+    Team = "ccqw"
   }
 }
 
@@ -55,6 +56,7 @@ resource "aws_instance" "amazon-linux" {
 
   tags = {
     Name = "al2-test"
+    Team = "ccqw"
   }
 }
 
@@ -65,5 +67,16 @@ resource "aws_instance" "rhel" {
 
   tags = {
     Name = "rhel-test"
+    Team = "ccqw"
+  }
+}
+
+resource "aws_s3_bucket" "b" {
+  bucket = "ccqw-terraform-opa-actions-example-test-bucket"
+  acl    = "private"
+
+  tags = {
+    Name = "ccqw-terraform-opa-actions-example-test-bucket"
+    Team = "ccqw"
   }
 }
