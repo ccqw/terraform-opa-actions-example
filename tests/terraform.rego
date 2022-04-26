@@ -20,6 +20,8 @@ weights := {
 # Consider exactly these resource types in calculations
 resource_types := {"aws_autoscaling_group", "aws_instance", "aws_security_group", "aws_iam", "aws_launch_configuration", "aws_s3_bucket"}
 
+minimum_tags = {"Name", "Team"}
+
 #########
 # Policy
 #########
@@ -94,6 +96,14 @@ num_modifies[resource_type] = num {
     num := count(modifies)
 }
 
+deny[msg] {
+    changeset := input.resource_changes[_]
+    changeset.type == "aws_security_group"
+    in := changeset.change.after.ingress[_]
+    contains(changeset.change.after.ingress[_].cidr_blocks, "0.0.0.0/0")
+    msg := sprintf("violation-sg-ingress_%v", [changeset.name])
+}
+
 violation["violation-s3-bucket-public"] {
    s3_acl_change[resource_types[_]] > 0
 }
@@ -130,8 +140,13 @@ s3_tags_change[resource_type] = num {
     num := count(modifies)
 }
 
+# helper functions
 tags_contain_proper_keys(tags) {
     keys := {key | tags[key]}
     leftover := minimum_tags - keys
     leftover == set()
+}
+
+contains(arr, elem) {
+  arr[_] = elem
 }
