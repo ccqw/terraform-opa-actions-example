@@ -16,9 +16,9 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
-        with:
-          # terraform_version: 0.13.0:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+        env: # Or as an environment variable
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       
       - name: Setup OPA
         uses: open-policy-agent/setup-opa@v1
@@ -28,29 +28,41 @@ jobs:
       - name: Terraform Format
         id: fmt
         run: terraform fmt -check
+        env: # Or as an environment variable
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Terraform Init
         id: init
         run: terraform init
+        env: # Or as an environment variable
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
+        env: # Or as an environment variable
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Terraform Plan
         id: plan
         if: github.event_name == 'pull_request'
         run: terraform plan -no-color -input=false
         continue-on-error: true
-      
-      - name: Terraform run url
-        id: tf-run-url
-        run: |
-          echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
+         env: # Or as an environment variable
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+     
+      # - name: Terraform run url
+      #   id: tf-run-url
+      #   run: |
+      #     echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
 
       - name: Convert Terraform execution plan to json for OPA
-        run: |
-          curl $(echo $(curl --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" --header "Content-Type: application/vnd.api+json" "https://app.terraform.io/api/v2/${{ steps.tf-run-url.outputs.RUN_URL }}/plan/json-output" | grep -o -P '(?<= <a href=").*(?=">)')) -o tfplan.json
+        run: terraform show -json tfplan.binary > tfplan.json
 
       - name: Evaluate the OPA policy on Terraform plan authz
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.authz"
