@@ -1,0 +1,114 @@
+name: "Terraform"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  terraform:
+    name: "Terraform"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          # terraform_version: 0.13.0:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v1
+        with:
+          version: latest
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+      
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -no-color -input=false
+        continue-on-error: true
+      
+      - name: Terraform run url
+        id: tf-run-url
+        run: |
+          echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
+
+      - name: Convert Terraform execution plan to json for OPA
+        run: |
+          curl $(echo $(curl --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" --header "Content-Type: application/vnd.api+json" "https://app.terraform.io/api/v2/${{ steps.tf-run-url.outputs.RUN_URL }}/plan/json-output" | grep -o -P '(?<= <a href=").*(?=">)')) -o tfplan.json
+
+      - name: Evaluate the OPA policy on Terraform plan authz
+        run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.authz"
+      
+      - name: Evaluate the OPA policy on Terraform plan score
+        run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.score"
+      
+      - name: Evaluate the OPA policy to ensure S3 bucket is not public
+        id: opa-s3-public
+        run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-s3-bucket-public".* ]]; then exit 1; fi
+
+      # naming convention set in terraform.rego
+      # bucket must start with 'ccqw-terraform-opa-actions-example'
+      - name: Evaluate the OPA policy to ensure S3 bucket follows naming convention
+        id: opa-s3-name
+        run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-s3-bucket-name".* ]]; then exit 1; fi
+      
+      - name: Evaluate the OPA policy to ensure minimum tags are present
+        id: opa-tags
+        run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-missing-required-tags".* ]]; then exit 1; fi
+      
+      - name: Evaluate the OPA policy to ensure no SG ingress rule violation
+        id: opa-sg-ingress
+        run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.deny')" =~ .*"violation-sg-ingress_".* ]]; then exit 1; fi
+
+      - uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`\n
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve -input=false
