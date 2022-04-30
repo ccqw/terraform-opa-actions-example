@@ -11,12 +11,10 @@ terraform {
   }
   required_version = ">= 1.1.0"
 
-  cloud {
-    organization = "swidjaja531"
-
-    workspaces {
-      name = "gh-actions"
-    }
+  backend "s3" {
+    bucket = "ccqw-scratch-terraform-tfstates-us-east-1"
+    key    = "terraform-opa-actions-example.tfstate"
+    region = "us-east-1"
   }
 }
 
