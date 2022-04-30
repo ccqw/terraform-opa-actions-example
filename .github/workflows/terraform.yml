@@ -61,6 +61,9 @@ jobs:
       #   run: |
       #     echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
 
+      - name: See what is in the pwd
+        run: ls -laht
+
       - name: Convert Terraform execution plan to json for OPA
         run: terraform show -json tfplan.binary > tfplan.json
 
@@ -123,4 +126,4 @@ jobs:
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve -input=false
+        run: terraform apply "tfplan.binary" -auto-approve -input=false 
