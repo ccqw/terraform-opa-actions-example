@@ -66,6 +66,9 @@ jobs:
 
       - name: Convert Terraform execution plan to json for OPA
         run: terraform show -json tfplan.binary > tfplan.json
+        env: # Or as an environment variable
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Evaluate the OPA policy on Terraform plan authz
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.authz"
