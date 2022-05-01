@@ -2,21 +2,19 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "3.26.0"
+      version = "3.75.1"
     }
     random = {
       source  = "hashicorp/random"
-      version = "3.0.1"
+      version = "3.1.3"
     }
   }
   required_version = ">= 1.1.0"
 
-  cloud {
-    organization = "swidjaja531"
-
-    workspaces {
-      name = "gh-actions"
-    }
+  backend "s3" {
+    bucket = "ccqw-scratch-terraform-tfstates-us-east-1"
+    key    = "terraform-opa-actions-example.tfstate"
+    region = "us-east-1"
   }
 }
 

@@ -16,10 +16,10 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
-        with:
-          # terraform_version: 0.13.0:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-      
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Setup OPA
         uses: open-policy-agent/setup-opa@v1
         with:
@@ -28,36 +28,45 @@ jobs:
       - name: Terraform Format
         id: fmt
         run: terraform fmt -check
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Terraform Init
         id: init
         run: terraform init
-      
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Terraform Plan
         id: plan
         if: github.event_name == 'pull_request'
-        run: terraform plan -no-color -input=false
+        run: terraform plan -no-color -input=false --out tfplan.binary
         continue-on-error: true
-      
-      - name: Terraform run url
-        id: tf-run-url
-        run: |
-          echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Convert Terraform execution plan to json for OPA
-        run: |
-          curl $(echo $(curl --header "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" --header "Content-Type: application/vnd.api+json" "https://app.terraform.io/api/v2/${{ steps.tf-run-url.outputs.RUN_URL }}/plan/json-output" | grep -o -P '(?<= <a href=").*(?=">)')) -o tfplan.json
+        run: terraform show -json tfplan.binary > tfplan.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Evaluate the OPA policy on Terraform plan authz
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.authz"
-      
+
       - name: Evaluate the OPA policy on Terraform plan score
         run: opa eval --data tests/terraform.rego  --input tfplan.json  "data.terraform.analysis.score"
-      
+
       - name: Evaluate the OPA policy to ensure S3 bucket is not public
         id: opa-s3-public
         run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-s3-bucket-public".* ]]; then exit 1; fi
@@ -67,11 +76,11 @@ jobs:
       - name: Evaluate the OPA policy to ensure S3 bucket follows naming convention
         id: opa-s3-name
         run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-s3-bucket-name".* ]]; then exit 1; fi
-      
+
       - name: Evaluate the OPA policy to ensure minimum tags are present
         id: opa-tags
         run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.violation')" =~ .*"violation-missing-required-tags".* ]]; then exit 1; fi
-      
+
       - name: Evaluate the OPA policy to ensure no SG ingress rule violation
         id: opa-sg-ingress
         run: if [[ "$(opa eval -f pretty --data tests/terraform.rego --input tfplan.json 'data.terraform.analysis.deny')" =~ .*"violation-sg-ingress_".* ]]; then exit 1; fi
@@ -111,4 +120,4 @@ jobs:
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: terraform apply -auto-approve -input=false
+        run: terraform apply "tfplan.binary" -auto-approve -input=false
