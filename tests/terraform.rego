@@ -104,7 +104,7 @@ deny[msg] {
     msg := sprintf("violation-sg-ingress_%v", [changeset.name])
 }
 
-violation["violation-s3-bucket-public"] {
+violation["violation-s3-bucket-public-acl"] {
    s3_acl_change[resource_types[_]] > 0
 }
 
@@ -120,7 +120,7 @@ s3_acl_change[resource_type] = num {
     some resource_type
     resource_types[resource_type]
     all := resources[resource_type]
-    modifies := [res |  res:= all[_]; res.change.after.acl == "public"; res.change.after.website != null]
+    modifies := [res |  res:= all[_]; re_match(`public-.*`, (res.change.after.acl)); res.change.after.website != null]
     num := count(modifies)
 }
 
