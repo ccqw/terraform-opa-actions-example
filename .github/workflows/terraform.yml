@@ -54,16 +54,7 @@ jobs:
         env: # Or as an environment variable
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
      
-      # - name: Terraform run url
-      #   id: tf-run-url
-      #   run: |
-      #     echo "::set-output name=RUN_URL::$(echo "${{ steps.plan.outputs.stdout }}" | grep https | sed -e 's/https:\/\/app.terraform.io\/app\/swidjaja531\/gh-actions\///g')"
-
-      - name: See what is in the pwd
-        run: ls -laht
-
       - name: Convert Terraform execution plan to json for OPA
         run: terraform show -json tfplan.binary > tfplan.json
         env: # Or as an environment variable
