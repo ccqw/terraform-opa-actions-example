@@ -61,6 +61,9 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+      - name: Print out TF plan for debug
+        run: cat tfplan.json
+
       - name: Evaluate the OPA policy on Terraform plan authz
         run: opa eval --data tests/blast-radius.rego  --input tfplan.json  "data.terraform.analysis.authz"
 
