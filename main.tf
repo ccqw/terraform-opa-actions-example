@@ -74,7 +74,7 @@ resource "aws_s3_bucket" "b" {
   acl    = "public-read"
 
   tags = {
-    Name = "ccqw-terraform-opa-actions-example-test-bucket"
+    Name                = "ccqw-terraform-opa-actions-example-test-bucket"
     NonCompliantTagTeam = "ccqw"
   }
 }
