@@ -53,7 +53,7 @@ touches_iam {
 ####################
 
 # list of all resources of a given type
-resources[resource_type] := all {
+resources[resource_type] = all {
     some resource_type
     resource_types[resource_type]
     all := [name |
@@ -63,7 +63,7 @@ resources[resource_type] := all {
 }
 
 # number of creations of resources of a given type
-num_creates[resource_type] := num {
+num_creates[resource_type] = num {
     some resource_type
     resource_types[resource_type]
     all := resources[resource_type]
@@ -71,9 +71,8 @@ num_creates[resource_type] := num {
     num := count(creates)
 }
 
-
 # number of deletions of resources of a given type
-num_deletes[resource_type] := num {
+num_deletes[resource_type] = num {
     some resource_type
     resource_types[resource_type]
     all := resources[resource_type]
@@ -82,7 +81,7 @@ num_deletes[resource_type] := num {
 }
 
 # number of modifications to resources of a given type
-num_modifies[resource_type] := num {
+num_modifies[resource_type] = num {
     some resource_type
     resource_types[resource_type]
     all := resources[resource_type]

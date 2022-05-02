@@ -75,7 +75,7 @@ jobs:
 
       - name: Evaluate for violations
         id: violations-show
-        run: conftest test --policy tests/ tfplan.json
+        run: conftest test --policy tests/policies.rego tfplan.json
 
       - name: Fail given violations
         id: violations-fail
