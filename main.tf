@@ -30,7 +30,7 @@ resource "aws_security_group" "github-actions-ssh-sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0", "10.0.0.0/8"]
   }
 
   // allow internet access
@@ -71,10 +71,10 @@ resource "aws_instance" "rhel" {
 
 resource "aws_s3_bucket" "b" {
   bucket = "ccqw-terraform-opa-actions-example-test-bucket"
-  acl    = "private"
+  acl    = "public-read"
 
   tags = {
     Name = "ccqw-terraform-opa-actions-example-test-bucket"
-    Team = "ccqw"
+    NonCompliantTagTeam = "ccqw"
   }
 }
