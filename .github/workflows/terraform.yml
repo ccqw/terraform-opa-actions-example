@@ -24,6 +24,9 @@ jobs:
         uses: open-policy-agent/setup-opa@v1
         with:
           version: latest
+      
+      - name: Setup conftest for OPA
+        uses: artis3n/setup-conftest@v0
 
       - name: Terraform Format
         id: fmt
@@ -65,18 +68,19 @@ jobs:
         run: cat tfplan.json
 
       - name: Evaluate the OPA policy on Terraform plan authz
-        run: opa eval --data tests/blast-radius.rego  --input tfplan.json  "data.terraform.analysis.authz"
+        run: opa eval -f pretty --data tests  --input tfplan.json  "data.terraform.analysis.authz"
 
       - name: Evaluate the OPA policy on Terraform plan blast radius score
-        run: opa eval --data tests/blast-radius.rego  --input tfplan.json  "data.terraform.analysis.score"
+        run: opa eval -f pretty --data tests  --input tfplan.json  "data.terraform.analysis.score"
 
       - name: Evaluate for violations
         id: violations-show
-        run: opa eval -f pretty --data tests/policies.rego --input tfplan.json 'data.terraform.analysis.deny'
+        run: conftest test --policy tests/ tfplan.json
 
       - name: Fail given violations
         id: violations-fail
-        run: if [[ "$(opa eval -f pretty --data tests/policies.rego --input tfplan.json 'data.terraform.analysis.deny')" ]]; then exit 1; fi
+        if: ${{ steps.violations-show.outputs.exitcode }} != 0
+        run: exit 1
 
       - uses: actions/github-script@v6
         if: github.event_name == 'pull_request'

@@ -1,6 +1,4 @@
-package terraform.analysis
-
-import input as tfplan
+package main
 
 ########################
 # Parameters for Policy
